@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Bookings - Lab Booking System</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-light">
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container">
+      <a class="navbar-brand" href="dashboard.html">Lab Booking System</a>
+      <div class="navbar-nav ms-auto">
+        <a class="nav-link" href="dashboard.html">Dashboard</a>
+        <a class="nav-link" href="book.html">Book Resource</a>
+        <a class="nav-link active" href="my-bookings.html">My Bookings</a>
+        <a class="nav-link text-danger" href="#" onclick="logout()">Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h2 class="mb-4">My Booking History</h2>
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-striped align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Time Slot</th>
+                <th>Purpose</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="myBookingsTable">
+              <tr><td colspan="6" class="text-center">Loading your bookings...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://ztkxkkpddtqutskjngia.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_M70P-kbGsjZ6Lgpb9BeB1w_Iz6NxORm";
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user) { location.href = 'login.html'; }
+
+    function logout() {
+      localStorage.removeItem('user');
+      location.href = 'login.html';
+    }
+
+    async function loadMyBookings() {
+      const { data, error } = await db.from('bookings')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      const tbody = document.getElementById('myBookingsTable');
+      if (error) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${error.message}</td></tr>`;
+        return;
+      }
+
+      if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">You have no bookings yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.map(b => `
+        <tr>
+          <td>#${b.id}</td>
+          <td><span class="badge bg-secondary text-uppercase">${b.resource_type}</span></td>
+          <td>${new Date(b.start_time).toLocaleString()}<br><small class="text-muted">to ${new Date(b.end_time).toLocaleString()}</small></td>
+          <td>${b.purpose} <br><small class="text-muted">Qty: ${b.quantity}</small></td>
+          <td><span class="badge bg-${getStatusColor(b.status)}">${b.status}</span></td>
+          <td>
+            ${b.status === 'Pending Approval' || b.status === 'Approved' ? `
+              <button class="btn btn-sm btn-outline-danger" onclick="cancelBooking(${b.id}, ${b.resource_id}, '${b.resource_type}', ${b.quantity}, '${b.status}')">Cancel</button>
+            ` : `<span class="text-muted small">None</span>`}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function getStatusColor(status) {
+      switch(status) {
+        case 'Approved': return 'success';
+        case 'Pending Approval': return 'warning text-dark';
+        case 'Rejected': return 'danger';
+        case 'Cancelled': return 'secondary';
+        case 'In Use': return 'primary';
+        case 'Completed': return 'info';
+        default: return 'dark';
+      }
+    }
+
+    async function cancelBooking(id, resourceId, resourceType, quantity, status) {
+      if (!confirm('Are you sure you want to cancel this booking?')) return;
+
+      // Restore equipment stock if cancelling an already approved request
+      if (status === 'Approved' && resourceType === 'equipment') {
+        const { data: eq } = await db.from('equipment').select('available_qty').eq('id', resourceId).single();
+        if (eq) {
+          await db.from('equipment').update({ available_qty: eq.available_qty + quantity }).eq('id', resourceId);
+        }
+      }
+
+      const { error } = await db.from('bookings')
+        .update({ status: 'Cancelled' })
+        .eq('id', id);
+
+      if (error) {
+        alert('Failed to cancel: ' + error.message);
+      } else {
+        loadMyBookings();
+      }
+    }
+
+    loadMyBookings();
+  </script>
+</body>
+</html>
