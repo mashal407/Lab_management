@@ -62,12 +62,12 @@
     const user = JSON.parse(localStorage.getItem('user'));
     if (!user || (user.role !== 'staff' && user.role !== 'admin')) {
       alert('Access denied! Staff or Admin privileges required.');
-      location.href = 'dashboard.html';
+      location.href = 'index.html';
     }
 
     function logout() {
       localStorage.removeItem('user');
-      location.href = 'login.html';
+      location.href = 'index.html';
     }
 
     async function loadAllBookings() {
