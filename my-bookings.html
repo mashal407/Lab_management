@@ -54,11 +54,11 @@
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const user = JSON.parse(localStorage.getItem('user'));
-    if (!user) { location.href = 'login.html'; }
+    if (!user) { location.href = 'index.html'; }
 
     function logout() {
       localStorage.removeItem('user');
-      location.href = 'login.html';
+      location.href = 'index.html';
     }
 
     async function loadMyBookings() {
